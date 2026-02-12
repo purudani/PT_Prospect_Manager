@@ -14,6 +14,19 @@ A simple web application to manage physical therapist prospects, filter them by 
 
 ## Quick Setup (5 minutes)
 
+> **⚠️ Important:** The `Data.xlsx` file is not included in this repository (too large for GitHub).  
+> You need to obtain this file separately and place it in the project root before running the app.
+
+### Step 0: Get the Data File
+
+1. **Obtain `Data.xlsx`** from the project owner (via email, Dropbox, Google Drive, etc.)
+2. **Place it in the project root** (same folder as this README)
+3. **Generate the JSON data:**
+   ```bash
+   node convert-data.js
+   ```
+   This creates `prospects.json` and `frontend/public/prospects.json` files.
+
 ### Step 1: Install Dependencies
 
 ```bash
