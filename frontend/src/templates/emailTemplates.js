@@ -3,8 +3,8 @@
 export const defaultTemplate = {
   subject: "PT Job Opportunity + Referral Bonus",
   message: `<p>Hi [First Name],</p>
-<p>Liberty Physical Therapy is seeking passionate new grads and experienced clinicians for our <strong>Physical Therapist</strong> role in the heart of <strong>Jersey City, NJ</strong>.</p>
-<p>Join the largest and <strong>#1-rated</strong> outpatient PT practice in Jersey City, where you'll treat patients <strong>1-on-1</strong> and have strong support for <strong>continuing education and growth</strong>.</p>
+<p>[Your Company Name] is seeking passionate new grads and experienced clinicians for our <strong>Physical Therapist</strong> role in the heart of <strong>[Location]</strong>.</p>
+<p>Join the largest and <strong>#1-rated</strong> outpatient PT practice in [Location], where you'll treat patients <strong>1-on-1</strong> and have strong support for <strong>continuing education and growth</strong>.</p>
 <p><strong>Compensation &amp; Benefits</strong></p>
 <ul>
 <li>Excellent salary ⭐ <strong>sign-on bonus</strong></li>
@@ -16,7 +16,7 @@ export const defaultTemplate = {
 <li>Commuter benefits</li>
 </ul>
 <p><strong>Know someone who'd be a great fit?</strong> We're offering a <strong>$200 referral bonus</strong>*</p>
-<p>Apply or refer here: <a href="https://www.libertyptnj.com/physical-therapist">www.libertyptnj.com/physical-therapist</a></p>
+<p>Apply or refer here: <a href="[Link]">[Link]</a></p>
 <p>Best regards,</p>`
 };
 
