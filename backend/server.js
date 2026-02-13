@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { sendEmails, testConnection } from './emailService.js';
+import { sendEmails, testConnection, testAlias } from './emailService.js';
 import { readProspects, writeProspects } from './dataSync.js';
 
 dotenv.config({ path: '../.env' });
@@ -31,10 +31,57 @@ app.get('/api/email/test', async (req, res) => {
     }
 });
 
+// Get default from email
+app.get('/api/email/default-from', (req, res) => {
+    const defaultEmail = process.env.OFFICE365_USER_EMAIL;
+    if (defaultEmail) {
+        res.json({ success: true, email: defaultEmail });
+    } else {
+        res.status(500).json({ 
+            success: false, 
+            message: 'No default email configured' 
+        });
+    }
+});
+
+// Test if an alias can be used (query parameter version - easier to use)
+app.get('/api/email/test-alias', async (req, res) => {
+    try {
+        const aliasEmail = req.query.email;
+        if (!aliasEmail) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Please provide email parameter: /api/email/test-alias?email=your-alias@domain.com' 
+            });
+        }
+        const result = await testAlias(aliasEmail);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: error.message 
+        });
+    }
+});
+
+// Test if an alias can be used (URL parameter version - for backwards compatibility)
+app.get('/api/email/test-alias/:email', async (req, res) => {
+    try {
+        const aliasEmail = req.params.email;
+        const result = await testAlias(aliasEmail);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: error.message 
+        });
+    }
+});
+
 // Send emails endpoint
 app.post('/api/send-emails', async (req, res) => {
     try {
-        const { recipients, subject, message, senderName } = req.body;
+        const { recipients, subject, message, fromEmail } = req.body;
         
         // Validate request body
         if (!recipients || !Array.isArray(recipients)) {
@@ -51,9 +98,16 @@ app.post('/api/send-emails', async (req, res) => {
             });
         }
         
-        console.log(`Sending emails to ${recipients.length} recipients...`);
+        if (!fromEmail) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'From email is required' 
+            });
+        }
         
-        const result = await sendEmails(recipients, subject, message, senderName);
+        console.log(`Sending emails to ${recipients.length} recipients from ${fromEmail}...`);
+        
+        const result = await sendEmails(recipients, subject, message, fromEmail);
         
         console.log(`Email send complete: ${result.sent} sent, ${result.failed} failed`);
         
@@ -334,12 +388,17 @@ app.listen(PORT, () => {
     console.log(`✓ API endpoints:`);
     console.log(`  - GET    /api/health`);
     console.log(`  - GET    /api/email/test`);
+    console.log(`  - GET    /api/email/default-from`);
+    console.log(`  - GET    /api/email/test-alias/:email`);
     console.log(`  - POST   /api/send-emails`);
     console.log(`  - GET    /api/prospects`);
     console.log(`  - PUT    /api/prospects/:licenseNumber`);
     console.log(`  - POST   /api/prospects`);
     console.log(`  - DELETE /api/prospects/:licenseNumber`);
     console.log(`  - POST   /api/prospects/bulk-delete`);
-    console.log(`\nUsing Office365 OAuth2 authentication`);
-    console.log(`Make sure to complete Azure AD app registration (see README.md)\n`);
+    console.log(`\n✓ Using Office365 OAuth2 authentication`);
+    console.log(`✓ Default sending email: ${process.env.OFFICE365_USER_EMAIL || 'NOT SET'}`);
+    console.log(`\n💡 To test email alias, open in browser:`);
+    console.log(`   http://localhost:${PORT}/api/email/test-alias?email=your-alias@domain.com`);
+    console.log(`📖 See README.md and ALIAS_SETUP_GUIDE.md for setup instructions\n`);
 });

@@ -1,12 +1,14 @@
-# PT Prospect Manager
+# Prospect Manager
 
-A simple web application to manage physical therapist prospects, filter them by location and experience, and send bulk emails.
+A simple web application to manage licensed professional prospects, filter them by location and experience, and send bulk emails with tracking.
 
 ## Features
 
-- 📊 **View & Filter** 13,682+ PT prospects by state, city, zip code, and years licensed
+- 📊 **View & Filter** prospects by state, city, zip code, and years licensed
 - 🔍 **Quick Search** across names, emails, license numbers
 - ✉️ **Send Bulk Emails** via Microsoft Graph API (OAuth2)
+- 🎨 **Rich Text Formatting** - format emails with bold, italic, lists, and links
+- 📧 **Custom From Address** - use your main email or aliases (e.g., hr@company.com)
 - 📤 **Export to Excel** - export filtered or selected prospects
 - 🎨 **Professional UI** with email templates included
 - 💾 **Excel Sync** - all changes automatically save back to Data.xlsx
@@ -238,7 +240,35 @@ Open http://localhost:3001/api/email/test
 ```json
 {
   "success": true,
-  "message": "Microsoft Graph API connection successful. Connected as: Your Name (your.email@company.com)"
+  "message": "Microsoft Graph API connection successful. Connected as: Your Name (your.email@company.com)",
+  "availableAliases": ["your.email@company.com", "hr@company.com"]
+}
+```
+
+**Step 1.5: Test Your Alias (If Using One)**
+
+If you're trying to send from an alias like `hr@company.com`, test it first:
+
+Open: `http://localhost:3001/api/email/test-alias?email=hr@company.com`
+
+✅ **Success looks like:**
+```json
+{
+  "success": true,
+  "isValidAlias": true,
+  "aliases": ["youremail@company.com", "hr@company.com"],
+  "message": "✅ 'hr@company.com' is a valid alias and can be used"
+}
+```
+
+❌ **Alias not configured:**
+```json
+{
+  "success": true,
+  "isValidAlias": false,
+  "aliases": ["youremail@company.com"],
+  "message": "⚠️ 'hr@company.com' is NOT in your mailbox aliases...",
+  "help": "Add this alias in Microsoft 365 Admin Center → Users → Email Aliases"
 }
 ```
 
@@ -384,10 +414,10 @@ After running `node convert-data.js`, your Excel file will have **2 new columns*
 - ⚠️ Client secrets expire after 24 months - set a reminder
 
 ### Data
-- The app shows 13,682 PT prospects from New Jersey
-- ~90% have email addresses (12,329 records)
+- Supports large datasets with thousands of prospects
 - Data is automatically cleaned (city names normalized, etc.)
 - **All changes sync back to Data.xlsx automatically**
+- Track email status and blocked prospects
 
 ### Email Limits
 - Office365 allows 10,000 emails/day (varies by plan)

@@ -193,7 +193,6 @@ export default function AddProspectModal({ isOpen, onClose }) {
                   name="licenseNo"
                   value={formData.licenseNo}
                   onChange={handleChange}
-                  placeholder="Optional - defaults to License Number"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -303,7 +302,6 @@ export default function AddProspectModal({ isOpen, onClose }) {
                   name="state"
                   value={formData.state}
                   onChange={handleChange}
-                  placeholder="e.g., NJ"
                   maxLength="2"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
