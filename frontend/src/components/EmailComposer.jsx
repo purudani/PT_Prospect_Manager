@@ -13,14 +13,23 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
 
-  // Initialize recipients from selected prospects
+  // Initialize recipients from selected prospects (excluding blocked ones)
   useState(() => {
-    const initialRecipients = selectedProspects.map(p => ({
-      id: p.id,
-      name: p.firstName || p.fullName,
-      email: p.email
-    }));
+    const initialRecipients = selectedProspects
+      .filter(p => !p.blocked) // Filter out blocked prospects
+      .map(p => ({
+        id: p.id,
+        name: p.firstName || p.fullName,
+        email: p.email
+      }));
     setRecipients(initialRecipients);
+    
+    // Show warning if some prospects were blocked
+    const blockedCount = selectedProspects.filter(p => p.blocked).length;
+    if (blockedCount > 0) {
+      setError(`${blockedCount} blocked prospect${blockedCount > 1 ? 's were' : ' was'} excluded from recipients`);
+      setTimeout(() => setError(null), 5000);
+    }
   }, [selectedProspects]);
 
   const removeRecipient = (index) => {

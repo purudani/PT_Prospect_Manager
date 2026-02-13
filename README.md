@@ -9,6 +9,26 @@ A simple web application to manage physical therapist prospects, filter them by 
 - ✉️ **Send Bulk Emails** via Microsoft Graph API (OAuth2)
 - 📤 **Export to Excel** - export filtered or selected prospects
 - 🎨 **Professional UI** with email templates included
+- 💾 **Excel Sync** - all changes automatically save back to Data.xlsx
+- ✅ **Email Tracking** - track when emails were sent to each prospect
+- 🚫 **Block List** - mark prospects to prevent sending emails
+- ➕ **Add Prospects** - manually add new prospects through the UI
+
+### 🔄 Data Flow
+
+**Excel is your master database!** Everything syncs back automatically:
+
+```
+Data.xlsx ←→ prospects.json ←→ Application
+     ↑                              ↓
+     └──────── All updates ─────────┘
+```
+
+When you:
+- ✅ Send an email → Updates Excel with timestamp
+- 🚫 Block a prospect → Updates Excel with "Yes"
+- ➕ Add a new prospect → Adds new row to Excel
+- 📝 Any change → Syncs to Excel immediately
 
 ---
 
@@ -21,11 +41,18 @@ A simple web application to manage physical therapist prospects, filter them by 
 
 1. **Obtain `Data.xlsx`** from the project owner (via email, Dropbox, Google Drive, etc.)
 2. **Place it in the project root** (same folder as this README)
-3. **Generate the JSON data:**
+3. **Run the conversion script:**
    ```bash
    node convert-data.js
    ```
-   This creates `prospects.json` and `frontend/public/prospects.json` files.
+   
+   This script will:
+   - ✅ Read your Excel file
+   - ✅ Clean and normalize the data
+   - ✅ Add 2 new tracking columns to Excel: `email_sent` and `blocked`
+   - ✅ Create JSON files for the application
+   
+   **Important:** After running this once, all future updates (emails sent, blocks, new prospects) will automatically sync back to `Data.xlsx`. You don't need to run this again unless you get a fresh Excel file with new prospects.
 
 ### Step 1: Install Dependencies
 
@@ -298,14 +325,15 @@ npm start
 
 ```
 NJCA/
-├── Data.xlsx              # Original data (13,682 prospects)
-├── prospects.json         # Converted data (used by app)
-├── convert-data.js        # Script to convert Excel → JSON
+├── Data.xlsx              # Master Excel file (syncs with all changes!)
+├── prospects.json         # JSON copy (synced from Excel)
+├── convert-data.js        # Script to convert Excel → JSON + add columns
 ├── .env                   # Your credentials (DO NOT COMMIT!)
 ├── .env.example           # Template for credentials
 ├── backend/               # Node.js/Express API
 │   ├── server.js         # API server
-│   └── emailService.js   # Graph API email service
+│   ├── emailService.js   # Graph API email service
+│   └── dataSync.js       # Excel sync logic (writes back to Data.xlsx)
 └── frontend/             # React UI
     ├── src/
     │   ├── components/   # UI components
@@ -313,8 +341,38 @@ NJCA/
     │   ├── templates/    # Email templates
     │   └── utils/        # Export helpers
     └── public/
-        └── prospects.json # Data for frontend
+        └── prospects.json # Frontend copy (synced from Excel)
 ```
+
+---
+
+## 📊 Excel Integration & New Columns
+
+### New Tracking Columns in Data.xlsx
+
+After running `node convert-data.js`, your Excel file will have **2 new columns**:
+
+| Column | Description | Values |
+|--------|-------------|--------|
+| `email_sent` | Timestamp when email was sent | ISO date string or empty |
+| `blocked` | Whether prospect is blocked from emails | "Yes" or "No" |
+
+### How Excel Sync Works
+
+**Every action in the app updates Excel automatically:**
+
+1. **Send Email** → Excel updates with timestamp in `email_sent` column
+2. **Block Prospect** → Excel updates with "Yes" in `blocked` column
+3. **Unblock Prospect** → Excel updates with "No" in `blocked` column
+4. **Add New Prospect** → New row added to Excel with all fields
+
+**You can:**
+- ✅ Open `Data.xlsx` anytime to see current status
+- ✅ Share the Excel file with your team
+- ✅ Use Excel for reports and analysis
+- ✅ Edit in Excel and re-run `node convert-data.js` to sync back
+
+**Excel is your single source of truth!**
 
 ---
 
@@ -329,6 +387,7 @@ NJCA/
 - The app shows 13,682 PT prospects from New Jersey
 - ~90% have email addresses (12,329 records)
 - Data is automatically cleaned (city names normalized, etc.)
+- **All changes sync back to Data.xlsx automatically**
 
 ### Email Limits
 - Office365 allows 10,000 emails/day (varies by plan)

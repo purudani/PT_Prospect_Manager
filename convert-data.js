@@ -72,6 +72,7 @@ try {
             professionName: row.profession_name || '',
             licenseType: row.license_type_name || '',
             licenseNo: row.license_no || '',
+            licenseNumber: row.license_no || '', // Unique identifier for API calls
             licenseStatus: row.license_status_name || '',
             
             // Dates - both raw and formatted
@@ -92,14 +93,62 @@ try {
             county: toTitleCase(row.addr_county || ''),
             
             // Contact
-            email: (row.addr_email || '').toLowerCase().trim()
+            email: (row.addr_email || '').toLowerCase().trim(),
+            
+            // Tracking fields
+            email_sent: null,  // Will store timestamp when email is sent
+            blocked: false     // Flag to prevent sending emails
         };
     });
     
-    // Write to JSON file
+    // Write to JSON files
     fs.writeFileSync('prospects.json', JSON.stringify(prospects, null, 2));
+    fs.writeFileSync('frontend/public/prospects.json', JSON.stringify(prospects, null, 2));
     
-    console.log(`✓ Successfully converted ${prospects.length} records to prospects.json`);
+    console.log(`✓ Successfully converted ${prospects.length} records to JSON files`);
+    
+    // Write back to Excel with new columns (email_sent, blocked)
+    console.log('✓ Adding new tracking columns to Excel file...');
+    
+    const excelData = prospects.map(p => {
+        // Get original row data, preserving Excel date serials
+        const originalRow = rawData[prospects.indexOf(p)];
+        
+        return {
+            full_name: p.fullName,
+            first_name: p.firstName,
+            middle_name: p.middleName,
+            last_name: p.lastName,
+            name_suffix: p.nameSuffix,
+            license_no: p.licenseNo,
+            license_type_name: p.licenseType,
+            license_status_name: p.licenseStatus,
+            profession_name: p.professionName,
+            issue_date: originalRow.issue_date, // Preserve original Excel serial
+            expiration_date: originalRow.expiration_date, // Preserve original Excel serial
+            addr_line_1: p.addressLine1,
+            addr_line_2: p.addressLine2,
+            addr_city: p.city,
+            addr_state: p.state,
+            addr_zipcode: p.zipCode,
+            addr_county: p.county,
+            addr_email: p.email,
+            email_sent: p.email_sent || '', // NEW COLUMN
+            blocked: p.blocked ? 'Yes' : 'No' // NEW COLUMN
+        };
+    });
+    
+    // Create new worksheet with updated data
+    const newWorksheet = XLSX.utils.json_to_sheet(excelData);
+    
+    // Create new workbook
+    const newWorkbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'Sheet1');
+    
+    // Write back to Excel
+    XLSX.writeFile(newWorkbook, 'Data.xlsx');
+    
+    console.log(`✓ Updated Data.xlsx with new tracking columns`);
     
     // Show some statistics
     const withEmail = prospects.filter(p => p.email).length;
@@ -111,6 +160,8 @@ try {
     console.log(`- Unique states: ${uniqueStates}`);
     console.log(`- Unique cities: ${uniqueCities}`);
     console.log(`- Date range: ${Math.min(...prospects.filter(p => p.yearsSinceLicense).map(p => p.yearsSinceLicense))} to ${Math.max(...prospects.filter(p => p.yearsSinceLicense).map(p => p.yearsSinceLicense))} years`);
+    console.log(`\n⚠️  IMPORTANT: Data.xlsx now has 2 new columns (email_sent, blocked)`);
+    console.log(`   All future updates will sync back to this Excel file automatically!`);
     
 } catch (error) {
     console.error('Error:', error);

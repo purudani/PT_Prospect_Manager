@@ -4,14 +4,18 @@ import FilterPanel from './components/FilterPanel';
 import ProspectsTable from './components/ProspectsTable';
 import ProfileModal from './components/ProfileModal';
 import EmailComposer from './components/EmailComposer';
+import AddProspectModal from './components/AddProspectModal';
 import Notification from './components/Notification';
 import LoadingSpinner from './components/LoadingSpinner';
 import { exportToExcel, exportSelectedToExcel } from './utils/exportHelpers';
 
 function App() {
-  const { prospects, filteredProspects, selectedIds, loading, error } = useProspects();
+  const { prospects, filteredProspects, selectedIds, loading, error, bulkDeleteProspects } = useProspects();
   const [selectedProspect, setSelectedProspect] = useState(null);
   const [showEmailComposer, setShowEmailComposer] = useState(false);
+  const [showAddProspect, setShowAddProspect] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [notification, setNotification] = useState(null);
 
   const handleSendSuccess = (result) => {
@@ -53,6 +57,32 @@ function App() {
         message: `Export failed: ${error.message}`
       });
       setTimeout(() => setNotification(null), 5000);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setDeleting(true);
+    try {
+      // Get license numbers of selected prospects
+      const selectedProspects = prospects.filter(p => selectedIds.has(p.id));
+      const licenseNumbers = selectedProspects.map(p => p.licenseNumber);
+      
+      const result = await bulkDeleteProspects(licenseNumbers);
+      
+      setNotification({
+        type: 'success',
+        message: `Successfully deleted ${result.deleted} prospect(s)`
+      });
+      setTimeout(() => setNotification(null), 5000);
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      setNotification({
+        type: 'error',
+        message: `Delete failed: ${error.message}`
+      });
+      setTimeout(() => setNotification(null), 5000);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -107,6 +137,16 @@ function App() {
                 )}
               </div>
               <div className="flex gap-2">
+                <button
+                  onClick={() => setShowAddProspect(true)}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md font-medium hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
+                  title="Add a new prospect manually"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Prospect
+                </button>
                 <button
                   onClick={handleExportFiltered}
                   disabled={filteredProspects.length === 0}
@@ -164,7 +204,7 @@ function App() {
         </div>
       </main>
 
-      {/* Bottom Bar - Send Email Button */}
+      {/* Bottom Bar - Action Buttons */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
           <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
@@ -174,15 +214,26 @@ function App() {
                   {selectedIds.size} prospect{selectedIds.size !== 1 ? 's' : ''} selected
                 </p>
               </div>
-              <button
-                onClick={() => setShowEmailComposer(true)}
-                className="px-6 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                Send Email
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="px-6 py-2 bg-red-600 text-white rounded-md font-medium hover:bg-red-700 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete Selected
+                </button>
+                <button
+                  onClick={() => setShowEmailComposer(true)}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Send Email
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -201,6 +252,54 @@ function App() {
           onClose={() => setShowEmailComposer(false)}
           onSendSuccess={handleSendSuccess}
         />
+      )}
+
+      {showAddProspect && (
+        <AddProspectModal
+          isOpen={showAddProspect}
+          onClose={() => setShowAddProspect(false)}
+        />
+      )}
+
+      {/* Bulk Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Delete Selected Prospects</h3>
+                <p className="text-sm text-gray-600">This action cannot be undone</p>
+              </div>
+            </div>
+            
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to permanently delete <strong>{selectedIds.size} prospect{selectedIds.size !== 1 ? 's' : ''}</strong>? 
+              {' '}This will remove them from the database and Excel file.
+            </p>
+            
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={deleting}
+                className="px-4 py-2 bg-red-600 text-white rounded-md font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? 'Deleting...' : 'Delete Permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

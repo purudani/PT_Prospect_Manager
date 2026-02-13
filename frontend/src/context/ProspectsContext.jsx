@@ -142,6 +142,139 @@ export function ProspectsProvider({ children }) {
     return prospects.filter(p => selectedIds.has(p.id) && p.email);
   }, [prospects, selectedIds]);
 
+  // Update prospect (for email_sent, blocked flags)
+  const updateProspect = async (licenseNumber, updates) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/prospects/${licenseNumber}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update prospect');
+      }
+
+      const result = await response.json();
+      
+      // Update local state
+      setProspects(prevProspects => 
+        prevProspects.map(p => 
+          p.licenseNumber === licenseNumber 
+            ? { ...p, ...updates }
+            : p
+        )
+      );
+
+      return result.data;
+    } catch (error) {
+      console.error('Error updating prospect:', error);
+      throw error;
+    }
+  };
+
+  // Add new prospect
+  const addProspect = async (prospectData) => {
+    try {
+      const response = await fetch('http://localhost:3001/api/prospects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(prospectData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to add prospect');
+      }
+
+      const result = await response.json();
+      
+      // Add to local state
+      setProspects(prevProspects => [...prevProspects, result.data]);
+
+      return result.data;
+    } catch (error) {
+      console.error('Error adding prospect:', error);
+      throw error;
+    }
+  };
+
+  // Delete single prospect
+  const deleteProspect = async (licenseNumber) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/prospects/${licenseNumber}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to delete prospect');
+      }
+
+      const result = await response.json();
+      
+      // Remove from local state
+      setProspects(prevProspects => 
+        prevProspects.filter(p => p.licenseNumber !== licenseNumber)
+      );
+
+      // Remove from selection if selected
+      setSelectedIds(prevSelected => {
+        const newSet = new Set(prevSelected);
+        // Find the prospect's id and remove it
+        const prospect = prospects.find(p => p.licenseNumber === licenseNumber);
+        if (prospect) {
+          newSet.delete(prospect.id);
+        }
+        return newSet;
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Error deleting prospect:', error);
+      throw error;
+    }
+  };
+
+  // Bulk delete prospects
+  const bulkDeleteProspects = async (licenseNumbers) => {
+    try {
+      const response = await fetch('http://localhost:3001/api/prospects/bulk-delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ licenseNumbers }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to delete prospects');
+      }
+
+      const result = await response.json();
+      
+      // Remove from local state
+      const deletedSet = new Set(licenseNumbers);
+      setProspects(prevProspects => 
+        prevProspects.filter(p => !deletedSet.has(p.licenseNumber))
+      );
+
+      // Clear selection
+      clearSelection();
+
+      return result;
+    } catch (error) {
+      console.error('Error bulk deleting prospects:', error);
+      throw error;
+    }
+  };
+
   const value = {
     prospects,
     filteredProspects,
@@ -160,7 +293,11 @@ export function ProspectsProvider({ children }) {
     toggleSelection,
     selectAll,
     clearSelection,
-    toggleSelectAll
+    toggleSelectAll,
+    updateProspect,
+    addProspect,
+    deleteProspect,
+    bulkDeleteProspects
   };
 
   return (

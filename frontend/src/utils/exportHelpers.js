@@ -30,7 +30,9 @@ export function exportToExcel(prospects, filename = 'prospects_export') {
     'Issue Date': prospect.issueDate || '',
     'Expiration Date': prospect.expirationDate || '',
     'Years Since License': prospect.yearsSinceLicense !== null ? prospect.yearsSinceLicense : '',
-    'Profession': prospect.professionName
+    'Profession': prospect.professionName,
+    'Email Sent': prospect.email_sent ? new Date(prospect.email_sent).toLocaleString() : 'Not Sent',
+    'Blocked': prospect.blocked ? 'Yes' : 'No'
   }));
 
   // Create worksheet
@@ -55,7 +57,9 @@ export function exportToExcel(prospects, filename = 'prospects_export') {
     { wch: 15 }, // Issue Date
     { wch: 15 }, // Expiration Date
     { wch: 18 }, // Years Since License
-    { wch: 20 }  // Profession
+    { wch: 20 }, // Profession
+    { wch: 22 }, // Email Sent
+    { wch: 10 }  // Blocked
   ];
   worksheet['!cols'] = columnWidths;
 
