@@ -81,7 +81,7 @@ app.get('/api/email/test-alias/:email', async (req, res) => {
 // Send emails endpoint
 app.post('/api/send-emails', async (req, res) => {
     try {
-        const { recipients, subject, message, fromEmail } = req.body;
+        const { recipients, subject, previewText, message, fromEmail } = req.body;
         
         // Validate request body
         if (!recipients || !Array.isArray(recipients)) {
@@ -107,7 +107,7 @@ app.post('/api/send-emails', async (req, res) => {
         
         console.log(`Sending emails to ${recipients.length} recipients from ${fromEmail}...`);
         
-        const result = await sendEmails(recipients, subject, message, fromEmail);
+        const result = await sendEmails(recipients, subject, message, fromEmail, previewText);
         
         console.log(`Email send complete: ${result.sent} sent, ${result.failed} failed`);
         

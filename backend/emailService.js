@@ -66,7 +66,7 @@ function textToHtml(text) {
         .replace(/\n/g, '<br>');
 }
 
-export async function sendEmails(recipients, subject, message, fromEmail = null) {
+export async function sendEmails(recipients, subject, message, fromEmail = null, previewText = null) {
     try {
         if (!process.env.OFFICE365_USER_EMAIL) {
             throw new Error('Office365 user email not found. Please set OFFICE365_USER_EMAIL in .env file.');
@@ -121,13 +121,21 @@ export async function sendEmails(recipients, subject, message, fromEmail = null)
                     personalizedMessage = message.replace(/\[First Name\]/g, recipient.name);
                 }
                 
+                // Add preview text (preheader) if provided
+                let fullHtmlMessage = personalizedMessage;
+                if (previewText) {
+                    // Add hidden preheader text that shows in inbox preview
+                    const preheader = `<div style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${previewText}</div>`;
+                    fullHtmlMessage = preheader + personalizedMessage;
+                }
+                
                 // Prepare email message for Graph API
                 const mailMessage = {
                     message: {
                         subject: subject,
                         body: {
                             contentType: 'HTML',
-                            content: personalizedMessage // Already HTML from rich text editor
+                            content: fullHtmlMessage
                         },
                         toRecipients: [
                             {

@@ -8,6 +8,7 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
   const [newRecipient, setNewRecipient] = useState('');
   const [fromEmail, setFromEmail] = useState('');
   const [subject, setSubject] = useState('');
+  const [previewText, setPreviewText] = useState('');
   const [message, setMessage] = useState('');
   const [showTemplates, setShowTemplates] = useState(false);
   const [sending, setSending] = useState(false);
@@ -130,6 +131,7 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
         body: JSON.stringify({
           recipients,
           subject,
+          previewText: previewText.trim() || undefined,
           message: htmlMessage,
           fromEmail: fromEmail.trim()
         })
@@ -156,6 +158,7 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
     const template = templates[templateKey];
     if (template) {
       setSubject(template.subject);
+      setPreviewText(template.previewText || '');
       // Templates are already in HTML format, use directly
       setEditorContent(template.message);
       setShowTemplates(false);
@@ -331,6 +334,24 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
               disabled={sending}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             />
+          </div>
+
+          {/* Preview Text */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Preview Text
+            </label>
+            <input
+              type="text"
+              value={previewText}
+              onChange={(e) => setPreviewText(e.target.value)}
+              disabled={sending}
+              maxLength={150}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Appears in inbox below subject line ({previewText.length}/150 characters)
+            </p>
           </div>
 
           {/* Message with Rich Text Editor */}
