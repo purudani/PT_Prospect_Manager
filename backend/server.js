@@ -9,6 +9,11 @@ dotenv.config({ path: '../.env' });
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+function normalizeLicenseNumber(value) {
+    if (value === null || value === undefined) return '';
+    return String(value).trim();
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -155,10 +160,13 @@ app.get('/api/prospects', (req, res) => {
 app.put('/api/prospects/:licenseNumber', (req, res) => {
     try {
         const { licenseNumber } = req.params;
+        const normalizedLicenseNumber = normalizeLicenseNumber(licenseNumber);
         const updates = req.body;
         
         const prospects = readProspects();
-        const index = prospects.findIndex(p => p.licenseNumber === licenseNumber);
+        const index = prospects.findIndex(
+            p => normalizeLicenseNumber(p.licenseNumber) === normalizedLicenseNumber
+        );
         
         if (index === -1) {
             return res.status(404).json({ 
@@ -214,12 +222,12 @@ app.post('/api/prospects/bulk-delete', (req, res) => {
         console.log(`Bulk delete request for ${licenseNumbers.length} prospects`);
         
         const prospects = readProspects();
-        const toDelete = new Set(licenseNumbers);
+        const toDelete = new Set(licenseNumbers.map(normalizeLicenseNumber));
         const deletedProspects = [];
         
         // Filter out prospects to delete
         const remainingProspects = prospects.filter(p => {
-            if (toDelete.has(p.licenseNumber)) {
+            if (toDelete.has(normalizeLicenseNumber(p.licenseNumber))) {
                 deletedProspects.push(p);
                 return false;
             }
@@ -260,6 +268,68 @@ app.post('/api/prospects/bulk-delete', (req, res) => {
     }
 });
 
+// Bulk update prospects (currently supports blocked flag)
+app.post('/api/prospects/bulk-update', (req, res) => {
+    try {
+        const { licenseNumbers, blocked } = req.body;
+
+        if (!licenseNumbers || !Array.isArray(licenseNumbers) || licenseNumbers.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'licenseNumbers array is required'
+            });
+        }
+
+        if (typeof blocked !== 'boolean') {
+            return res.status(400).json({
+                success: false,
+                message: 'blocked must be a boolean'
+            });
+        }
+
+        const targets = new Set(licenseNumbers.map(normalizeLicenseNumber));
+        const prospects = readProspects();
+        const updatedProspects = [];
+
+        prospects.forEach((prospect) => {
+            const normalized = normalizeLicenseNumber(prospect.licenseNumber);
+            if (targets.has(normalized)) {
+                prospect.blocked = blocked;
+                updatedProspects.push(prospect);
+            }
+        });
+
+        if (updatedProspects.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No matching prospects found'
+            });
+        }
+
+        const success = writeProspects(prospects);
+        if (!success) {
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to save bulk updates'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `Updated ${updatedProspects.length} prospect(s)`,
+            updated: updatedProspects.length,
+            blocked,
+            updatedProspects
+        });
+    } catch (error) {
+        console.error('Bulk update error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
 // Add a new prospect
 app.post('/api/prospects', (req, res) => {
     try {
@@ -279,7 +349,9 @@ app.post('/api/prospects', (req, res) => {
         const prospects = readProspects();
         
         // Check if license number already exists
-        const exists = prospects.some(p => p.licenseNumber === newProspect.licenseNumber);
+        const exists = prospects.some(
+            p => normalizeLicenseNumber(p.licenseNumber) === normalizeLicenseNumber(newProspect.licenseNumber)
+        );
         if (exists) {
             return res.status(400).json({ 
                 success: false, 
@@ -326,11 +398,14 @@ app.post('/api/prospects', (req, res) => {
 app.delete('/api/prospects/:licenseNumber', (req, res) => {
     try {
         const { licenseNumber } = req.params;
+        const normalizedLicenseNumber = normalizeLicenseNumber(licenseNumber);
         
         console.log(`Delete request for license: ${licenseNumber}`);
         
         const prospects = readProspects();
-        const index = prospects.findIndex(p => p.licenseNumber === licenseNumber);
+        const index = prospects.findIndex(
+            p => normalizeLicenseNumber(p.licenseNumber) === normalizedLicenseNumber
+        );
         
         if (index === -1) {
             console.log(`Prospect not found: ${licenseNumber}`);
@@ -396,6 +471,7 @@ app.listen(PORT, () => {
     console.log(`  - POST   /api/prospects`);
     console.log(`  - DELETE /api/prospects/:licenseNumber`);
     console.log(`  - POST   /api/prospects/bulk-delete`);
+    console.log(`  - POST   /api/prospects/bulk-update`);
     console.log(`\n✓ Using Office365 OAuth2 authentication`);
     console.log(`✓ Default sending email: ${process.env.OFFICE365_USER_EMAIL || 'NOT SET'}`);
     console.log(`\n💡 To test email alias, open in browser:`);

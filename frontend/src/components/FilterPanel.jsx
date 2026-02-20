@@ -71,7 +71,9 @@ export default function FilterPanel() {
       state: '',
       cities: [],
       zipCode: '',
-      yearsRanges: []
+      yearsRanges: [],
+      emailSent: '',
+      blocked: ''
     });
     setCitySearch('');
   };
@@ -80,7 +82,9 @@ export default function FilterPanel() {
     (filters.state ? 1 : 0) +
     (filters.cities.length > 0 ? 1 : 0) +
     (filters.zipCode ? 1 : 0) +
-    (filters.yearsRanges.length > 0 ? 1 : 0);
+    (filters.yearsRanges.length > 0 ? 1 : 0) +
+    (filters.emailSent ? 1 : 0) +
+    (filters.blocked ? 1 : 0);
 
   // Filter cities based on search
   const filteredCities = uniqueCities.filter(city =>
@@ -232,6 +236,38 @@ export default function FilterPanel() {
           placeholder="Enter zip code..."
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
+      </div>
+
+      {/* Email Sent Filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Email Sent
+        </label>
+        <select
+          value={filters.emailSent}
+          onChange={(e) => setFilters({ ...filters, emailSent: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="">All</option>
+          <option value="sent">Sent</option>
+          <option value="not_sent">Not Sent</option>
+        </select>
+      </div>
+
+      {/* Blocked Filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Blocked
+        </label>
+        <select
+          value={filters.blocked}
+          onChange={(e) => setFilters({ ...filters, blocked: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="">All</option>
+          <option value="blocked">Blocked</option>
+          <option value="not_blocked">Not Blocked</option>
+        </select>
       </div>
 
       {/* Years Since License Filter - Multi-select */}

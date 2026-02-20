@@ -1,6 +1,12 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 
 const ProspectsContext = createContext();
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+
+function normalizeLicenseNumber(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
 
 export function ProspectsProvider({ children }) {
   const [prospects, setProspects] = useState([]);
@@ -11,7 +17,9 @@ export function ProspectsProvider({ children }) {
     state: '',
     cities: [], // Changed to array for multiple selection
     zipCode: '',
-    yearsRanges: [] // Changed to array for multiple ranges
+    yearsRanges: [], // Changed to array for multiple ranges
+    emailSent: '',
+    blocked: ''
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -20,13 +28,27 @@ export function ProspectsProvider({ children }) {
   useEffect(() => {
     async function loadProspects() {
       try {
-        const response = await fetch('/prospects.json');
-        if (!response.ok) throw new Error('Failed to load prospects data');
-        const data = await response.json();
-        setProspects(data);
-        setLoading(false);
+        const response = await fetch(`${API_BASE_URL}/api/prospects`);
+        if (!response.ok) throw new Error('Failed to load prospects data from API');
+
+        const result = await response.json();
+        if (!result.success || !Array.isArray(result.data)) {
+          throw new Error('Invalid prospects response format');
+        }
+
+        setProspects(result.data);
       } catch (err) {
-        setError(err.message);
+        try {
+          // Fallback to static file when backend is unavailable
+          const fallbackResponse = await fetch('/prospects.json');
+          if (!fallbackResponse.ok) throw new Error('Failed to load prospects fallback data');
+          const fallbackData = await fallbackResponse.json();
+          setProspects(fallbackData);
+          setError(`Live sync unavailable: ${err.message}. Using fallback data.`);
+        } catch (fallbackErr) {
+          setError(fallbackErr.message);
+        }
+      } finally {
         setLoading(false);
       }
     }
@@ -57,6 +79,18 @@ export function ProspectsProvider({ children }) {
         return filters.yearsRanges.some(range => 
           p.yearsSinceLicense >= range.min && p.yearsSinceLicense <= range.max
         );
+      });
+    }
+    if (filters.emailSent) {
+      filtered = filtered.filter(p => {
+        const hasEmailSent = Boolean(p.email_sent);
+        return filters.emailSent === 'sent' ? hasEmailSent : !hasEmailSent;
+      });
+    }
+    if (filters.blocked) {
+      filtered = filtered.filter(p => {
+        const isBlocked = Boolean(p.blocked);
+        return filters.blocked === 'blocked' ? isBlocked : !isBlocked;
       });
     }
 
@@ -145,7 +179,7 @@ export function ProspectsProvider({ children }) {
   // Update prospect (for email_sent, blocked flags)
   const updateProspect = async (licenseNumber, updates) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/prospects/${licenseNumber}`, {
+      const response = await fetch(`${API_BASE_URL}/api/prospects/${licenseNumber}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -179,7 +213,7 @@ export function ProspectsProvider({ children }) {
   // Add new prospect
   const addProspect = async (prospectData) => {
     try {
-      const response = await fetch('http://localhost:3001/api/prospects', {
+      const response = await fetch(`${API_BASE_URL}/api/prospects`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -207,7 +241,7 @@ export function ProspectsProvider({ children }) {
   // Delete single prospect
   const deleteProspect = async (licenseNumber) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/prospects/${licenseNumber}`, {
+      const response = await fetch(`${API_BASE_URL}/api/prospects/${licenseNumber}`, {
         method: 'DELETE',
       });
 
@@ -244,7 +278,7 @@ export function ProspectsProvider({ children }) {
   // Bulk delete prospects
   const bulkDeleteProspects = async (licenseNumbers) => {
     try {
-      const response = await fetch('http://localhost:3001/api/prospects/bulk-delete', {
+      const response = await fetch(`${API_BASE_URL}/api/prospects/bulk-delete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -275,6 +309,42 @@ export function ProspectsProvider({ children }) {
     }
   };
 
+  // Bulk update blocked flag
+  const bulkUpdateBlockedStatus = async (licenseNumbers, blocked) => {
+    try {
+      const normalizedLicenseNumbers = licenseNumbers.map(normalizeLicenseNumber);
+
+      const response = await fetch(`${API_BASE_URL}/api/prospects/bulk-update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ licenseNumbers: normalizedLicenseNumbers, blocked }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to bulk update blocked status');
+      }
+
+      const result = await response.json();
+      const targetSet = new Set(normalizedLicenseNumbers);
+
+      setProspects(prevProspects =>
+        prevProspects.map(p =>
+          targetSet.has(normalizeLicenseNumber(p.licenseNumber))
+            ? { ...p, blocked }
+            : p
+        )
+      );
+
+      return result;
+    } catch (error) {
+      console.error('Error bulk updating blocked status:', error);
+      throw error;
+    }
+  };
+
   const value = {
     prospects,
     filteredProspects,
@@ -297,7 +367,8 @@ export function ProspectsProvider({ children }) {
     updateProspect,
     addProspect,
     deleteProspect,
-    bulkDeleteProspects
+    bulkDeleteProspects,
+    bulkUpdateBlockedStatus
   };
 
   return (

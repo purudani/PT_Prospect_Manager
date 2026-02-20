@@ -10,12 +10,13 @@ import LoadingSpinner from './components/LoadingSpinner';
 import { exportToExcel, exportSelectedToExcel } from './utils/exportHelpers';
 
 function App() {
-  const { prospects, filteredProspects, selectedIds, loading, error, bulkDeleteProspects } = useProspects();
+  const { prospects, filteredProspects, selectedIds, loading, error, bulkDeleteProspects, bulkUpdateBlockedStatus } = useProspects();
   const [selectedProspect, setSelectedProspect] = useState(null);
   const [showEmailComposer, setShowEmailComposer] = useState(false);
   const [showAddProspect, setShowAddProspect] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [bulkUpdatingBlockStatus, setBulkUpdatingBlockStatus] = useState(false);
   const [notification, setNotification] = useState(null);
 
   const handleSendSuccess = (result) => {
@@ -83,6 +84,30 @@ function App() {
       setTimeout(() => setNotification(null), 5000);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleBulkBlockedStatus = async (blocked) => {
+    setBulkUpdatingBlockStatus(true);
+    try {
+      const selectedProspects = prospects.filter(p => selectedIds.has(p.id));
+      const licenseNumbers = selectedProspects.map(p => p.licenseNumber);
+
+      const result = await bulkUpdateBlockedStatus(licenseNumbers, blocked);
+
+      setNotification({
+        type: 'success',
+        message: `Successfully ${blocked ? 'blocked' : 'unblocked'} ${result.updated} prospect(s)`
+      });
+      setTimeout(() => setNotification(null), 5000);
+    } catch (error) {
+      setNotification({
+        type: 'error',
+        message: `Bulk ${blocked ? 'block' : 'unblock'} failed: ${error.message}`
+      });
+      setTimeout(() => setNotification(null), 5000);
+    } finally {
+      setBulkUpdatingBlockStatus(false);
     }
   };
 
@@ -223,6 +248,26 @@ function App() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                   Delete Selected
+                </button>
+                <button
+                  onClick={() => handleBulkBlockedStatus(true)}
+                  disabled={bulkUpdatingBlockStatus}
+                  className="px-6 py-2 bg-orange-600 text-white rounded-md font-medium hover:bg-orange-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-1.414-1.414L12 9.172 7.05 4.222 5.636 5.636 10.586 10.586 5.636 15.536 7.05 16.95 12 12 16.95 16.95 18.364 15.536 13.414 10.586z" />
+                  </svg>
+                  {bulkUpdatingBlockStatus ? 'Updating...' : 'Block Selected'}
+                </button>
+                <button
+                  onClick={() => handleBulkBlockedStatus(false)}
+                  disabled={bulkUpdatingBlockStatus}
+                  className="px-6 py-2 bg-emerald-600 text-white rounded-md font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  {bulkUpdatingBlockStatus ? 'Updating...' : 'Unblock Selected'}
                 </button>
                 <button
                   onClick={() => setShowEmailComposer(true)}
