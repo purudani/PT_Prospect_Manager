@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useProspects } from '../context/ProspectsContext';
+import { API_BASE_URL } from '../config/api';
 import { templates } from '../templates/emailTemplates';
 
 export default function EmailComposer({ onClose, onSendSuccess }) {
@@ -18,7 +19,7 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
   // Fetch default from email from backend and load default template
   useEffect(() => {
     // Fetch default email
-    fetch('http://localhost:3001/api/email/default-from')
+    fetch(`${API_BASE_URL}/api/email/default-from`)
       .then(res => res.json())
       .then(data => {
         if (data.success && data.email) {
@@ -123,7 +124,7 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:3001/api/send-emails', {
+      const response = await fetch(`${API_BASE_URL}/api/send-emails`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

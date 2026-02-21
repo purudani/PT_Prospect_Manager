@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { API_BASE_URL } from '../config/api';
 
 const ProspectsContext = createContext();
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
 function normalizeLicenseNumber(value) {
   if (value === null || value === undefined) return '';
