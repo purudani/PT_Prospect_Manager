@@ -66,6 +66,59 @@ function textToHtml(text) {
         .replace(/\n/g, '<br>');
 }
 
+function normalizeTemplateToken(token) {
+    return String(token || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+}
+
+function addTemplateValue(variables, key, value) {
+    const normalizedKey = normalizeTemplateToken(key);
+    const normalizedValue = value === null || value === undefined ? '' : String(value);
+
+    if (!normalizedKey) return;
+
+    variables[normalizedKey] = normalizedValue;
+    variables[`${normalizedKey}_url`] = encodeURIComponent(normalizedValue);
+}
+
+function buildTemplateVariables(recipient) {
+    const firstNameFromName = recipient?.name ? String(recipient.name).trim().split(/\s+/)[0] : '';
+    const firstName = recipient?.firstName || firstNameFromName || '';
+    const fullName = recipient?.fullName || recipient?.name || '';
+
+    const variables = {};
+    addTemplateValue(variables, 'first_name', firstName);
+    addTemplateValue(variables, 'last_name', recipient?.lastName || '');
+    addTemplateValue(variables, 'full_name', fullName);
+    addTemplateValue(variables, 'addr_email', recipient?.email || '');
+    addTemplateValue(variables, 'addr_city', recipient?.city || '');
+    addTemplateValue(variables, 'addr_state', recipient?.state || '');
+    addTemplateValue(variables, 'addr_zip', recipient?.zipCode || '');
+    addTemplateValue(variables, 'addr_zipcode', recipient?.zipCode || '');
+    addTemplateValue(variables, 'addr_county', recipient?.county || '');
+    addTemplateValue(variables, 'addr_line1', recipient?.addressLine1 || '');
+    addTemplateValue(variables, 'addr_line2', recipient?.addressLine2 || '');
+    addTemplateValue(variables, 'license_number', recipient?.licenseNumber || recipient?.licenseNo || '');
+    addTemplateValue(variables, 'license_type', recipient?.licenseType || '');
+
+    return variables;
+}
+
+function applyTemplateVariables(content, recipient) {
+    if (!content) return content;
+
+    const variables = buildTemplateVariables(recipient);
+    return content.replace(/\[([^\]]+)\]/g, (match, rawToken) => {
+        const normalizedToken = normalizeTemplateToken(rawToken);
+        if (!normalizedToken) return match;
+        if (!Object.prototype.hasOwnProperty.call(variables, normalizedToken)) return match;
+        return variables[normalizedToken];
+    });
+}
+
 export async function sendEmails(recipients, subject, message, fromEmail = null, previewText = null) {
     try {
         if (!process.env.OFFICE365_USER_EMAIL) {
@@ -115,24 +168,22 @@ export async function sendEmails(recipients, subject, message, fromEmail = null,
         
         for (const recipient of validRecipients) {
             try {
-                // Personalize the message with recipient name if available
-                let personalizedMessage = message;
-                if (recipient.name) {
-                    personalizedMessage = message.replace(/\[First Name\]/g, recipient.name);
-                }
+                const personalizedSubject = applyTemplateVariables(subject, recipient);
+                const personalizedMessage = applyTemplateVariables(message, recipient);
+                const personalizedPreviewText = applyTemplateVariables(previewText, recipient);
                 
                 // Add preview text (preheader) if provided
                 let fullHtmlMessage = personalizedMessage;
-                if (previewText) {
+                if (personalizedPreviewText) {
                     // Add hidden preheader text that shows in inbox preview
-                    const preheader = `<div style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${previewText}</div>`;
+                    const preheader = `<div style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${personalizedPreviewText}</div>`;
                     fullHtmlMessage = preheader + personalizedMessage;
                 }
                 
                 // Prepare email message for Graph API
                 const mailMessage = {
                     message: {
-                        subject: subject,
+                        subject: personalizedSubject,
                         body: {
                             contentType: 'HTML',
                             content: fullHtmlMessage

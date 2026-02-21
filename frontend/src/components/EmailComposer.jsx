@@ -39,7 +39,18 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
       .map(p => ({
         id: p.id,
         name: p.firstName || p.fullName,
-        email: p.email
+        fullName: p.fullName || '',
+        firstName: p.firstName || '',
+        lastName: p.lastName || '',
+        email: p.email,
+        city: p.city || '',
+        state: p.state || '',
+        zipCode: p.zipCode || '',
+        county: p.county || '',
+        addressLine1: p.addressLine1 || '',
+        addressLine2: p.addressLine2 || '',
+        licenseNumber: p.licenseNumber || p.licenseNo || '',
+        licenseType: p.licenseType || ''
       }));
     setRecipients(initialRecipients);
     
@@ -486,7 +497,7 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
             />
             
             <p className="text-xs text-gray-500 mt-1">
-              Use "[First Name]" in your message for personalization
+              Variables: [First Name], [Full Name], [addr_email], [addr_city], [addr_state], [addr_zip], [license_number]. For URL-safe values use tokens ending in _url, like [addr_city_url].
             </p>
           </div>
         </div>
