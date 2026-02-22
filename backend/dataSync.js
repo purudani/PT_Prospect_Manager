@@ -57,6 +57,16 @@ function toBlockedBoolean(value) {
     return false;
 }
 
+function toClickedBoolean(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value === 1;
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        return normalized === 'yes' || normalized === 'true' || normalized === '1' || normalized === 'clicked';
+    }
+    return false;
+}
+
 function normalizeLicenseNumber(value) {
     if (value === null || value === undefined) return '';
     return String(value).trim();
@@ -99,7 +109,8 @@ function readFromExcel() {
             county: toTitleCase(row.addr_county || ''),
             email: (row.addr_email || '').toLowerCase().trim(),
             email_sent: row.email_sent || null,
-            blocked: toBlockedBoolean(row.blocked)
+            blocked: toBlockedBoolean(row.blocked),
+            clicked: toClickedBoolean(row.clicked)
         };
     });
 }
@@ -204,7 +215,8 @@ function writeToExcel(prospects) {
             
             // NEW COLUMNS - Tracking fields
             email_sent: prospect.email_sent || '',
-            blocked: prospect.blocked ? 'Yes' : 'No'
+            blocked: prospect.blocked ? 'Yes' : 'No',
+            clicked: prospect.clicked ? 'Yes' : 'No'
         }));
         
         // Create worksheet from data

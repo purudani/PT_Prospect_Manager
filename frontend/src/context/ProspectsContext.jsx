@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { API_BASE_URL } from '../config/api';
 
@@ -19,7 +20,8 @@ export function ProspectsProvider({ children }) {
     zipCode: '',
     yearsRanges: [], // Changed to array for multiple ranges
     emailSent: '',
-    blocked: ''
+    blocked: '',
+    clicked: ''
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -93,15 +95,21 @@ export function ProspectsProvider({ children }) {
         return filters.blocked === 'blocked' ? isBlocked : !isBlocked;
       });
     }
+    if (filters.clicked) {
+      filtered = filtered.filter(p => {
+        const hasClicked = Boolean(p.clicked);
+        return filters.clicked === 'clicked' ? hasClicked : !hasClicked;
+      });
+    }
 
     // Apply search
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(p =>
-        p.fullName.toLowerCase().includes(query) ||
-        p.email.toLowerCase().includes(query) ||
-        p.licenseNo.toLowerCase().includes(query) ||
-        p.city.toLowerCase().includes(query)
+        (p.fullName || '').toLowerCase().includes(query) ||
+        (p.email || '').toLowerCase().includes(query) ||
+        (p.licenseNo || '').toLowerCase().includes(query) ||
+        (p.city || '').toLowerCase().includes(query)
       );
     }
 
@@ -155,8 +163,27 @@ export function ProspectsProvider({ children }) {
   };
 
   const selectAll = () => {
-    const allIds = new Set(filteredProspects.map(p => p.id));
-    setSelectedIds(allIds);
+    setSelectedIds(prevSelected => {
+      const newSet = new Set(prevSelected);
+      filteredProspects.forEach(p => newSet.add(p.id));
+      return newSet;
+    });
+  };
+
+  const selectByIds = (ids) => {
+    setSelectedIds(prevSelected => {
+      const newSet = new Set(prevSelected);
+      ids.forEach(id => newSet.add(id));
+      return newSet;
+    });
+  };
+
+  const clearByIds = (ids) => {
+    setSelectedIds(prevSelected => {
+      const newSet = new Set(prevSelected);
+      ids.forEach(id => newSet.delete(id));
+      return newSet;
+    });
   };
 
   const clearSelection = () => {
@@ -362,6 +389,8 @@ export function ProspectsProvider({ children }) {
     uniqueCities,
     toggleSelection,
     selectAll,
+    selectByIds,
+    clearByIds,
     clearSelection,
     toggleSelectAll,
     updateProspect,

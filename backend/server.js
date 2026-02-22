@@ -8,6 +8,7 @@ dotenv.config({ path: '../.env' });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const MAX_RECIPIENTS_PER_BATCH = 50;
 
 function normalizeLicenseNumber(value) {
     if (value === null || value === undefined) return '';
@@ -17,6 +18,17 @@ function normalizeLicenseNumber(value) {
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+function ensureTrackingColumnsInExcel() {
+    try {
+        const prospects = readProspects();
+        // Rewriting ensures newly introduced tracking fields (e.g. clicked) exist in Data.xlsx headers.
+        writeProspects(prospects);
+        console.log('✓ Verified tracking columns in Data.xlsx');
+    } catch (error) {
+        console.error('⚠️ Failed to verify tracking columns in Data.xlsx:', error.message);
+    }
+}
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -111,19 +123,55 @@ app.post('/api/send-emails', async (req, res) => {
         }
         
         console.log(`Sending emails to ${recipients.length} recipients from ${fromEmail}...`);
-        
-        const result = await sendEmails(recipients, subject, message, fromEmail, previewText);
-        
-        console.log(`Email send complete: ${result.sent} sent, ${result.failed} failed`);
+
+        const batches = [];
+        for (let i = 0; i < recipients.length; i += MAX_RECIPIENTS_PER_BATCH) {
+            batches.push(recipients.slice(i, i + MAX_RECIPIENTS_PER_BATCH));
+        }
+
+        const aggregateResult = {
+            success: true,
+            sent: 0,
+            failed: 0,
+            results: [],
+            errors: [],
+            totalRecipients: recipients.length,
+            totalBatches: batches.length
+        };
+
+        for (let i = 0; i < batches.length; i++) {
+            const batch = batches[i];
+            console.log(`Processing batch ${i + 1}/${batches.length} (${batch.length} recipients)`);
+
+            try {
+                const batchResult = await sendEmails(batch, subject, message, fromEmail, previewText);
+                aggregateResult.sent += batchResult.sent;
+                aggregateResult.failed += batchResult.failed;
+                aggregateResult.results.push(...batchResult.results);
+                aggregateResult.errors.push(...batchResult.errors);
+            } catch (batchError) {
+                aggregateResult.success = false;
+                aggregateResult.failed += batch.length;
+                aggregateResult.errors.push(
+                    ...batch.map(recipient => ({
+                        email: recipient.email,
+                        success: false,
+                        error: batchError.message
+                    }))
+                );
+            }
+        }
+
+        console.log(`Email send complete: ${aggregateResult.sent} sent, ${aggregateResult.failed} failed`);
         
         // Update email_sent timestamp for successfully sent emails
-        if (result.sent > 0) {
+        if (aggregateResult.sent > 0) {
             const prospects = readProspects();
             const timestamp = new Date().toISOString();
-            const successEmails = result.results.map(r => r.email);
+            const successEmails = new Set(aggregateResult.results.map(r => r.email));
             
             prospects.forEach(prospect => {
-                if (successEmails.includes(prospect.email)) {
+                if (successEmails.has(prospect.email)) {
                     prospect.email_sent = timestamp;
                 }
             });
@@ -131,7 +179,7 @@ app.post('/api/send-emails', async (req, res) => {
             writeProspects(prospects);
         }
         
-        res.json(result);
+        res.json(aggregateResult);
         
     } catch (error) {
         console.error('Send emails error:', error);
@@ -181,6 +229,9 @@ app.put('/api/prospects/:licenseNumber', (req, res) => {
         }
         if (updates.hasOwnProperty('email_sent')) {
             prospects[index].email_sent = updates.email_sent;
+        }
+        if (updates.hasOwnProperty('clicked')) {
+            prospects[index].clicked = Boolean(updates.clicked);
         }
         
         const success = writeProspects(prospects);
@@ -347,6 +398,11 @@ app.post('/api/prospects', (req, res) => {
         }
         
         const prospects = readProspects();
+
+        const nextId = prospects.reduce((maxId, prospect) => {
+            const numericId = Number(prospect.id);
+            return Number.isFinite(numericId) ? Math.max(maxId, numericId) : maxId;
+        }, 0) + 1;
         
         // Check if license number already exists
         const exists = prospects.some(
@@ -360,8 +416,10 @@ app.post('/api/prospects', (req, res) => {
         }
         
         // Add default values for tracking fields
+        newProspect.id = nextId;
         newProspect.email_sent = null;
         newProspect.blocked = false;
+        newProspect.clicked = false;
         
         // Add full name if not provided
         if (!newProspect.fullName) {
@@ -458,6 +516,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
+ensureTrackingColumnsInExcel();
 app.listen(PORT, () => {
     console.log(`\n✓ Server running on http://localhost:${PORT}`);
     console.log(`✓ API endpoints:`);

@@ -20,7 +20,7 @@ export default function ProfileModal({ prospect, onClose }) {
   const handleToggleBlock = async () => {
     setBlocking(true);
     try {
-      const updatedData = await updateProspect(currentProspect.licenseNumber, {
+      await updateProspect(currentProspect.licenseNumber, {
         blocked: !currentProspect.blocked
       });
       // Update local state immediately for real-time UI update
@@ -83,6 +83,14 @@ export default function ProfileModal({ prospect, onClose }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 Email sent {new Date(currentProspect.email_sent).toLocaleDateString()}
+              </span>
+            )}
+            {currentProspect.clicked && (
+              <span className="inline-flex items-center gap-1 mt-1 ml-2 px-2 py-1 text-xs font-semibold bg-indigo-100 text-indigo-700 rounded-full">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Link clicked
               </span>
             )}
           </div>

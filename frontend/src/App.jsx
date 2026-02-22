@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useProspects } from './context/ProspectsContext';
 import FilterPanel from './components/FilterPanel';
 import ProspectsTable from './components/ProspectsTable';
@@ -10,7 +10,7 @@ import LoadingSpinner from './components/LoadingSpinner';
 import { exportToExcel, exportSelectedToExcel } from './utils/exportHelpers';
 
 function App() {
-  const { prospects, filteredProspects, selectedIds, loading, error, bulkDeleteProspects, bulkUpdateBlockedStatus } = useProspects();
+  const { prospects, filteredProspects, selectedIds, loading, error, selectAll, clearByIds, bulkDeleteProspects, bulkUpdateBlockedStatus } = useProspects();
   const [selectedProspect, setSelectedProspect] = useState(null);
   const [showEmailComposer, setShowEmailComposer] = useState(false);
   const [showAddProspect, setShowAddProspect] = useState(false);
@@ -18,6 +18,13 @@ function App() {
   const [deleting, setDeleting] = useState(false);
   const [bulkUpdatingBlockStatus, setBulkUpdatingBlockStatus] = useState(false);
   const [notification, setNotification] = useState(null);
+
+  const filteredIds = useMemo(() => filteredProspects.map(p => p.id), [filteredProspects]);
+  const selectedFilteredCount = useMemo(
+    () => filteredProspects.filter(p => selectedIds.has(p.id)).length,
+    [filteredProspects, selectedIds]
+  );
+  const hasAnyFilteredSelected = selectedFilteredCount > 0;
 
   const handleSendSuccess = (result) => {
     setNotification({
@@ -183,6 +190,29 @@ function App() {
                   </svg>
                   Export Filtered
                 </button>
+                <button
+                  onClick={selectAll}
+                  disabled={filteredProspects.length === 0}
+                  className="px-4 py-2 bg-slate-700 text-white rounded-md font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+                  title="Select all currently filtered prospects"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Select All Filtered
+                </button>
+                {hasAnyFilteredSelected && (
+                  <button
+                    onClick={() => clearByIds(filteredIds)}
+                    className="px-4 py-2 bg-slate-200 text-slate-800 rounded-md font-medium hover:bg-slate-300 transition-colors flex items-center gap-2 text-sm"
+                    title="Unselect all currently filtered prospects"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Unselect Filtered
+                  </button>
+                )}
                 {selectedIds.size > 0 && (
                   <button
                     onClick={handleExportSelected}
@@ -213,7 +243,7 @@ function App() {
       )}
 
       {/* Main Content */}
-      <main className="w-full px-4 sm:px-6 lg:px-8 py-6">
+      <main className={`w-full px-4 sm:px-6 lg:px-8 py-6 ${selectedIds.size > 0 ? 'pb-32' : ''}`}>
         <div className="flex gap-6">
           {/* Sidebar - Filters */}
           <aside className="w-72 flex-shrink-0">
@@ -231,7 +261,7 @@ function App() {
 
       {/* Bottom Bar - Action Buttons */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40">
           <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
               <div>

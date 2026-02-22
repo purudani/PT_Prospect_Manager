@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useProspects } from '../context/ProspectsContext';
 import { API_BASE_URL } from '../config/api';
 import { templates } from '../templates/emailTemplates';
+
+const RECIPIENT_BATCH_SIZE = 50;
 
 export default function EmailComposer({ onClose, onSendSuccess }) {
   const { selectedProspects, clearSelection } = useProspects();
@@ -10,11 +12,20 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
   const [fromEmail, setFromEmail] = useState('');
   const [subject, setSubject] = useState('');
   const [previewText, setPreviewText] = useState('');
-  const [message, setMessage] = useState('');
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showAllRecipients, setShowAllRecipients] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const editorRef = useRef(null);
+
+  const batchCount = useMemo(() => {
+    return Math.ceil(recipients.length / RECIPIENT_BATCH_SIZE);
+  }, [recipients.length]);
+
+  const visibleRecipients = useMemo(() => {
+    if (showAllRecipients) return recipients;
+    return recipients.slice(0, RECIPIENT_BATCH_SIZE);
+  }, [recipients, showAllRecipients]);
 
   // Fetch default from email from backend and load default template
   useEffect(() => {
@@ -29,11 +40,16 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
       .catch(err => console.error('Failed to fetch default email:', err));
     
     // Load default template automatically
-    loadTemplate('default');
+    const defaultTemplate = templates.default;
+    if (defaultTemplate) {
+      setSubject(defaultTemplate.subject);
+      setPreviewText(defaultTemplate.previewText || '');
+      setEditorContent(defaultTemplate.message);
+    }
   }, []);
 
   // Initialize recipients from selected prospects (excluding blocked ones)
-  useState(() => {
+  useEffect(() => {
     const initialRecipients = selectedProspects
       .filter(p => !p.blocked) // Filter out blocked prospects
       .map(p => ({
@@ -155,8 +171,17 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
         throw new Error(result.message || 'Failed to send emails');
       }
 
-      // Success
       onSendSuccess(result);
+
+      // Keep failed recipients in composer for quick retry.
+      if (result.failed > 0) {
+        const failedEmails = new Set((result.errors || []).map(err => err.email).filter(Boolean));
+        setRecipients(prevRecipients => prevRecipients.filter(r => failedEmails.has(r.email)));
+        setError(`${result.failed} email${result.failed !== 1 ? 's' : ''} failed. Failed recipients remain selected so you can retry.`);
+        return;
+      }
+
+      // Full success
       clearSelection();
       onClose();
     } catch (err) {
@@ -277,13 +302,39 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               To: {recipients.length} recipient{recipients.length !== 1 ? 's' : ''}
             </label>
+
+            {recipients.length > RECIPIENT_BATCH_SIZE && (
+              <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                <p className="text-sm text-amber-800">
+                  {recipients.length} recipients selected. Emails will be sent automatically in {batchCount} batches of up to {RECIPIENT_BATCH_SIZE}. No manual removal needed.
+                </p>
+                <div className="mt-2 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRecipients(prev => prev.slice(0, RECIPIENT_BATCH_SIZE))}
+                    disabled={sending}
+                    className="text-xs font-medium text-amber-700 hover:text-amber-900 disabled:opacity-50"
+                  >
+                    Use first {RECIPIENT_BATCH_SIZE} only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAllRecipients(prev => !prev)}
+                    disabled={sending}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                  >
+                    {showAllRecipients ? `Show first ${RECIPIENT_BATCH_SIZE}` : `Show all ${recipients.length}`}
+                  </button>
+                </div>
+              </div>
+            )}
             
             {/* Recipients chips/tags */}
             <div className="border border-gray-300 rounded-md p-2 min-h-[100px] max-h-60 overflow-y-auto bg-white">
               <div className="flex flex-wrap gap-2">
-                {recipients.map((recipient, index) => (
+                {visibleRecipients.map((recipient, index) => (
                   <div
-                    key={index}
+                    key={`${recipient.email}-${index}`}
                     className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
                   >
                     {recipient.name && (
@@ -304,6 +355,12 @@ export default function EmailComposer({ onClose, onSendSuccess }) {
                     </button>
                   </div>
                 ))}
+
+                {!showAllRecipients && recipients.length > RECIPIENT_BATCH_SIZE && (
+                  <div className="inline-flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+                    +{recipients.length - RECIPIENT_BATCH_SIZE} more recipients
+                  </div>
+                )}
                 
                 {/* Add new recipient input */}
                 <input

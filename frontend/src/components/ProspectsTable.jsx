@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useProspects } from '../context/ProspectsContext';
 
 export default function ProspectsTable({ onViewProfile }) {
@@ -6,7 +6,8 @@ export default function ProspectsTable({ onViewProfile }) {
     filteredProspects,
     selectedIds,
     toggleSelection,
-    toggleSelectAll,
+    selectByIds,
+    clearByIds,
     sortConfig,
     setSortConfig,
     searchQuery,
@@ -16,6 +17,7 @@ export default function ProspectsTable({ onViewProfile }) {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [blockingProspect, setBlockingProspect] = useState(null);
+  const selectAllRef = useRef(null);
   const itemsPerPage = 50;
 
   const handleToggleBlock = async (prospect, e) => {
@@ -58,9 +60,36 @@ export default function ProspectsTable({ onViewProfile }) {
   const currentProspects = filteredProspects.slice(startIndex, endIndex);
 
   // Reset to page 1 when filter changes
-  useState(() => {
+  useEffect(() => {
     setCurrentPage(1);
   }, [filteredProspects.length]);
+
+  // Keep current page valid when data changes
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    if (!selectAllRef.current) return;
+    const isAllPageSelected = currentProspects.length > 0 &&
+      currentProspects.every(p => selectedIds.has(p.id));
+    const hasSomePageSelected = currentProspects.some(p => selectedIds.has(p.id));
+    selectAllRef.current.indeterminate = hasSomePageSelected && !isAllPageSelected;
+  }, [currentProspects, selectedIds]);
+
+  const isAllPageSelected = currentProspects.length > 0 &&
+    currentProspects.every(p => selectedIds.has(p.id));
+
+  const handleToggleCurrentPage = () => {
+    const currentPageIds = currentProspects.map(p => p.id);
+    if (isAllPageSelected) {
+      clearByIds(currentPageIds);
+    } else {
+      selectByIds(currentPageIds);
+    }
+  };
 
   const handleSort = (key) => {
     setSortConfig({
@@ -88,9 +117,6 @@ export default function ProspectsTable({ onViewProfile }) {
     );
   };
 
-  const isAllSelected = currentProspects.length > 0 && 
-    currentProspects.every(p => selectedIds.has(p.id));
-
   return (
     <div className="bg-white shadow-md rounded-lg overflow-hidden w-full">
       {/* Search Bar */}
@@ -112,7 +138,10 @@ export default function ProspectsTable({ onViewProfile }) {
       {/* Results Count */}
       <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
         <span className="text-sm text-gray-600">
-          Showing {startIndex + 1}-{Math.min(endIndex, filteredProspects.length)} of {filteredProspects.length} prospects
+          {filteredProspects.length === 0
+            ? 'Showing 0 of 0 prospects'
+            : `Showing ${startIndex + 1}-${Math.min(endIndex, filteredProspects.length)} of ${filteredProspects.length} prospects`
+          }
         </span>
         {selectedIds.size > 0 && (
           <span className="text-sm font-medium text-blue-600">
@@ -128,10 +157,12 @@ export default function ProspectsTable({ onViewProfile }) {
             <tr>
               <th className="px-4 py-3 text-left">
                 <input
+                  ref={selectAllRef}
                   type="checkbox"
-                  checked={isAllSelected}
-                  onChange={toggleSelectAll}
+                  checked={isAllPageSelected}
+                  onChange={handleToggleCurrentPage}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  title="Select all prospects on this page"
                 />
               </th>
               <th 
@@ -186,6 +217,9 @@ export default function ProspectsTable({ onViewProfile }) {
                 Email Sent
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Clicked
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -193,7 +227,7 @@ export default function ProspectsTable({ onViewProfile }) {
           <tbody className="divide-y divide-gray-200">
             {currentProspects.length === 0 ? (
               <tr>
-                <td colSpan="11" className="px-4 py-8 text-center text-gray-500">
+                <td colSpan="12" className="px-4 py-8 text-center text-gray-500">
                   No prospects match your filters
                 </td>
               </tr>
@@ -281,6 +315,15 @@ export default function ProspectsTable({ onViewProfile }) {
                     ) : (
                       <span className="text-gray-400 text-xs">Not sent</span>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      prospect.clicked
+                        ? 'bg-indigo-100 text-indigo-700'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {prospect.clicked ? 'Clicked' : 'Not clicked'}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
                     <button
